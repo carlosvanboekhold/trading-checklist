@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0d0d0d" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Trade Check" />
+  <title>Trade Checklist</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap');
+
+    :root {
+      --bg: #0d0d0d;
+      --bg2: #151515;
+      --bg3: #1c1c1c;
+      --bg4: #242424;
+      --border: #2a2a2a;
+      --border2: #333;
+      --text: #e8e8e8;
+      --text2: #888;
+      --text3: #555;
+      --green: #1D9E75;
+      --green-bg: #0a1a12;
+      --green-text: #5DCAA5;
+      --red: #E24B4A;
+      --red-bg: #1a0a0a;
+      --red-text: #F09595;
+      --amber: #EF9F27;
+      --amber-bg: #1a1200;
+      --nav-h: 64px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html, body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); height: 100%; overscroll-behavior: none; }
+
+    /* ── SCREENS ── */
+    .screen { display: none; flex-direction: column; min-height: 100vh; padding-bottom: var(--nav-h); }
+    .screen.active { display: flex; }
+
+    /* ── BOTTOM NAV ── */
+    .bottom-nav {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      height: var(--nav-h);
+      background: var(--bg2); border-top: 0.5px solid var(--border);
+      display: flex; align-items: stretch; z-index: 200;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    .nav-item {
+      flex: 1; display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 4px; cursor: pointer;
+      transition: opacity 0.15s; color: var(--text3);
+    }
+    .nav-item:active { opacity: 0.6; }
+    .nav-item.active { color: var(--green-text); }
+    .nav-icon { font-size: 22px; line-height: 1; }
+    .nav-label { font-size: 10px; font-weight: 500; letter-spacing: 0.03em; }
+
+    /* ── SHARED HEADER ── */
+    .hdr {
+      position: sticky; top: 0; z-index: 100;
+      background: var(--bg); border-bottom: 0.5px solid var(--border);
+      padding: max(env(safe-area-inset-top), 14px) 16px 12px;
+    }
+    .hdr-row { display: flex; align-items: center; gap: 10px; }
+    .hdr-back {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: var(--bg3); border: 0.5px solid var(--border2);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; flex-shrink: 0; font-size: 16px; color: var(--text2);
+    }
+    .hdr-back:active { opacity: 0.6; }
+    .hdr-title { font-size: 17px; font-weight: 600; letter-spacing: -0.3px; flex: 1; color: var(--text); }
+    .hdr-sub { font-size: 12px; color: var(--text3); margin-top: 2px; }
+
+    /* ── DASHBOARD ── */
+    .dash-body { flex: 1; overflow-y: auto; padding: 16px 16px 8px; }
+
+    .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 20px; }
+    .metric-card {
+      background: var(--bg2); border: 0.5px solid var(--border);
+      border-radius: 12px; padding: 14px;
+    }
+    .metric-card.full { grid-column: 1 / -1; }
+    .metric-num { font-size: 28px; font-weight: 600; font-family: 'DM Mono', monospace; line-height: 1; }
+    .metric-num.green { color: var(--green-text); }
+    .metric-num.red { color: var(--red-text); }
+    .metric-num.neutral { color: var(--text2); }
+    .metric-lbl { font-size: 11px; color: var(--text3); margin-top: 5px; text-transform: uppercase; letter-spacing: 0.06em; }
+
+    .winbar-wrap { margin-top: 10px; height: 4px; background: var(--bg4); border-radius: 2px; overflow: hidden; }
+    .winbar-fill { height: 100%; background: var(--green); border-radius: 2px; transition: width 0.4s ease; }
+
+    .section-hdr { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .section-hdr-label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; padding-left: 2px; }
+
+    .recent-pair-card {
+      background: var(--bg2); border: 0.5px solid var(--border);
+      border-radius: 12px; padding: 13px 14px; margin-bottom: 8px;
+      cursor: pointer; transition: background 0.1s;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .recent-pair-card:active { background: var(--bg3); }
+    .recent-pair-card.won { border-color: rgba(29,158,117,0.3); }
+    .recent-pair-card.lost { border-color: rgba(226,75,74,0.3); }
+    .rpc-left { flex: 1; min-width: 0; }
+    .rpc-name { font-size: 15px; font-weight: 500; font-family: 'DM Mono', monospace; }
+    .rpc-desc { font-size: 11px; color: var(--text3); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .rpc-right { text-align: right; flex-shrink: 0; }
+    .rpc-winrate { font-size: 14px; font-weight: 600; font-family: 'DM Mono', monospace; }
+    .rpc-winrate.green { color: var(--green-text); }
+    .rpc-winrate.red { color: var(--red-text); }
+    .rpc-winrate.neutral { color: var(--text3); }
+    .rpc-trades { font-size: 11px; color: var(--text3); margin-top: 2px; }
+
+    .empty-dash { text-align: center; padding: 40px 16px; color: var(--text3); font-size: 13px; line-height: 1.6; }
+    .empty-dash-hint { font-size: 12px; color: var(--text3); margin-top: 8px; opacity: 0.6; }
+
+    /* ── PAIR SELECTOR ── */
+    .search-wrap { padding: 12px 16px; border-bottom: 0.5px solid var(--border); }
+    .search-input {
+      width: 100%; background: var(--bg3); border: 0.5px solid var(--border2);
+      border-radius: 10px; padding: 9px 14px; font-size: 14px;
+      color: var(--text); font-family: 'DM Sans', sans-serif; outline: none;
+    }
+    .search-input::placeholder { color: var(--text3); }
+    .search-input:focus { border-color: var(--green); }
+    .pair-scroll { flex: 1; overflow-y: auto; padding-bottom: 8px; }
+    .cat-label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; padding: 16px 16px 6px; }
+    .pair-list { padding: 0 16px; }
+    .pair-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 14px; background: var(--bg2); border: 0.5px solid var(--border);
+      border-radius: 10px; cursor: pointer; transition: background 0.1s; margin-bottom: 4px;
+    }
+    .pair-row:active { background: var(--bg3); }
+    .pair-name { font-size: 14px; font-weight: 500; font-family: 'DM Mono', monospace; }
+    .pair-desc { font-size: 11px; color: var(--text3); margin-top: 1px; }
+    .pair-badge {
+      font-size: 11px; font-family: 'DM Mono', monospace;
+      background: var(--bg4); color: var(--text3); border: 0.5px solid var(--border2);
+      border-radius: 20px; padding: 3px 9px; white-space: nowrap; flex-shrink: 0;
+    }
+    .pair-badge.green { background: var(--green-bg); color: var(--green-text); border-color: var(--green); }
+    .pair-badge.red { background: var(--red-bg); color: var(--red-text); border-color: var(--red); }
+
+    /* ── PAIR HOME ── */
+    .pair-home-body { flex: 1; padding: 16px; overflow-y: auto; }
+    .new-analysis-btn {
+      width: 100%; padding: 16px; background: var(--green-bg); border: 1px solid var(--green);
+      border-radius: 14px; color: var(--green-text); font-size: 15px; font-weight: 500;
+      font-family: 'DM Sans', sans-serif; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      transition: opacity 0.15s; margin-bottom: 20px;
+    }
+    .new-analysis-btn:active { opacity: 0.7; }
+
+    .pair-stats-row { display: flex; gap: 8px; margin-bottom: 20px; }
+    .pair-stat {
+      flex: 1; background: var(--bg2); border: 0.5px solid var(--border);
+      border-radius: 10px; padding: 10px 12px; text-align: center;
+    }
+    .pair-stat-num { font-size: 20px; font-weight: 600; font-family: 'DM Mono', monospace; }
+    .pair-stat-num.green { color: var(--green-text); }
+    .pair-stat-num.red { color: var(--red-text); }
+    .pair-stat-num.neutral { color: var(--text2); }
+    .pair-stat-lbl { font-size: 10px; color: var(--text3); margin-top: 3px; text-transform: uppercase; letter-spacing: 0.05em; }
+
+    .history-sec-label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px; padding-left: 2px; }
+    .empty-state { text-align: center; padding: 32px 16px; color: var(--text3); font-size: 13px; }
+
+    .history-card {
+      background: var(--bg2); border: 0.5px solid var(--border);
+      border-radius: 12px; padding: 13px 14px; margin-bottom: 8px;
+    }
+    .history-card.won { border-color: rgba(29,158,117,0.35); }
+    .history-card.lost { border-color: rgba(226,75,74,0.35); }
+    .history-card-top { display: flex; justify-content: space-between; align-items: flex-start; cursor: pointer; }
+    .history-time { font-size: 11px; color: var(--text3); font-family: 'DM Mono', monospace; }
+    .history-chips { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 8px; cursor: pointer; }
+    .chip { font-size: 10px; padding: 3px 8px; border-radius: 20px; border: 0.5px solid var(--border2); color: var(--text3); background: var(--bg3); }
+    .chip.bull { background: var(--green-bg); color: var(--green-text); border-color: var(--green); }
+    .chip.bear { background: var(--red-bg); color: var(--red-text); border-color: var(--red); }
+    .chip.done { background: var(--green-bg); color: var(--green-text); border-color: var(--green); }
+    .history-progress { margin-top: 8px; height: 2px; background: var(--bg4); border-radius: 2px; overflow: hidden; cursor: pointer; }
+    .history-progress-fill { height: 100%; background: var(--green); border-radius: 2px; }
+
+    .outcome-row { display: flex; gap: 6px; margin-top: 10px; }
+    .outcome-btn {
+      flex: 1; padding: 7px 0; border-radius: 8px; font-size: 12px; font-weight: 500;
+      font-family: 'DM Sans', sans-serif; cursor: pointer; border: 0.5px solid var(--border2);
+      background: var(--bg3); color: var(--text3); transition: all 0.15s; text-align: center;
+    }
+    .outcome-btn:active { opacity: 0.7; }
+    .outcome-btn.win-btn.active { background: var(--green-bg); color: var(--green-text); border-color: var(--green); }
+    .outcome-btn.loss-btn.active { background: var(--red-bg); color: var(--red-text); border-color: var(--red); }
+
+    /* ── ANALYSIS ── */
+    .analysis-body { flex: 1; padding: 16px; overflow-y: auto; padding-bottom: 32px; }
+    .progress-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+    .progress-track { flex: 1; height: 3px; background: var(--bg4); border-radius: 2px; overflow: hidden; }
+    .progress-fill { height: 100%; background: var(--green); border-radius: 2px; transition: width 0.3s; }
+    .progress-label { font-size: 12px; color: var(--text3); font-family: 'DM Mono', monospace; min-width: 36px; text-align: right; }
+    .sec-label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; margin-top: 20px; padding-left: 2px; }
+    .sec-label:first-child { margin-top: 0; }
+    .tf-card { background: var(--bg2); border: 0.5px solid var(--border); border-radius: 14px; margin-bottom: 16px; }
+    .tf-block { border-bottom: 0.5px solid var(--border); }
+    .tf-block:last-child { border-bottom: none; }
+    .tf-top { display: flex; align-items: center; justify-content: space-between; padding: 11px 14px 8px; }
+    .tf-left { display: flex; align-items: center; gap: 8px; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border2); flex-shrink: 0; transition: background 0.2s; }
+    .dot.bull { background: var(--green); }
+    .dot.bear { background: var(--red); }
+    .tf-name { font-size: 13px; font-weight: 500; }
+    .bias-pills { display: flex; gap: 5px; }
+    .bias-pill {
+      font-size: 11px; padding: 4px 10px; border-radius: 20px;
+      border: 0.5px solid var(--border); color: var(--text3); background: var(--bg3);
+      cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.15s;
+    }
+    .bias-pill.bull { background: var(--green-bg); color: var(--green-text); border-color: var(--green); }
+    .bias-pill.bear { background: var(--red-bg); color: var(--red-text); border-color: var(--red); }
+    .bias-pill:active { opacity: 0.7; }
+    .patterns-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; padding: 0 14px 12px; }
+    .pat-btn {
+      font-size: 11px; padding: 7px 8px; border-radius: 8px;
+      border: 0.5px solid var(--border); color: var(--text3); background: var(--bg3);
+      text-align: center; cursor: pointer; font-family: 'DM Sans', sans-serif;
+      line-height: 1.3; transition: all 0.15s; user-select: none;
+    }
+    .pat-btn:active { opacity: 0.8; transform: scale(0.97); }
+    .pat-btn.spotted { background: var(--green-bg); color: var(--green-text); border-color: var(--green); }
+    .analysis-name-input {
+      width: 100%; background: var(--bg2); border: 0.5px solid var(--border2);
+      border-radius: 10px; padding: 11px 14px; font-size: 14px; font-weight: 500;
+      color: var(--text); font-family: 'DM Sans', sans-serif; outline: none;
+      margin-bottom: 16px;
+    }
+    .analysis-name-input::placeholder { color: var(--text3); font-weight: 400; }
+    .analysis-name-input:focus { border-color: var(--green); }
+    .analysis-name-readonly {
+      font-size: 14px; font-weight: 500; color: var(--text2);
+      padding: 4px 0; margin-bottom: 12px;
+    }
+    .history-name { font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 4px; }
+    .check-card { background: var(--bg2); border: 0.5px solid var(--border); border-radius: 14px; overflow: hidden; margin-bottom: 16px; }
+    .check-row {
+      display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px;
+      border-bottom: 0.5px solid var(--border); cursor: pointer; transition: background 0.1s;
+    }
+    .check-row:last-child { border-bottom: none; }
+    .check-row:active { background: var(--bg3); }
+    .checkbox {
+      width: 20px; height: 20px; border-radius: 6px; border: 1.5px solid var(--border2);
+      flex-shrink: 0; margin-top: 1px; display: flex; align-items: center; justify-content: center; transition: all 0.15s;
+    }
+    .checkbox.checked { background: var(--green); border-color: var(--green); }
+    .checkbox.checked::after {
+      content: ''; width: 5px; height: 9px;
+      border: 2px solid #fff; border-top: none; border-left: none;
+      transform: rotate(45deg) translateY(-1px); display: block;
+    }
+    .check-label { font-size: 13px; color: var(--text); line-height: 1.4; flex: 1; transition: color 0.15s; }
+    .check-label.checked { color: var(--text3); text-decoration: line-through; }
+    .news-tag {
+      font-size: 10px; padding: 2px 7px; border-radius: 8px;
+      background: var(--amber-bg); color: var(--amber);
+      border: 0.5px solid #3a2f00; margin-left: 6px; vertical-align: middle; white-space: nowrap;
+    }
+    .all-done { display: none; text-align: center; padding: 24px 16px; margin: 8px 0 16px; }
+    .all-done.visible { display: block; }
+    .done-icon { font-size: 40px; margin-bottom: 8px; }
+    .done-title { font-size: 16px; font-weight: 500; color: var(--green-text); margin-bottom: 4px; }
+    .done-sub { font-size: 13px; color: var(--text3); }
+    .save-btn {
+      width: 100%; padding: 14px; border-radius: 12px;
+      background: var(--green); border: none; color: #fff;
+      font-size: 15px; font-weight: 600; font-family: 'DM Sans', sans-serif;
+      cursor: pointer; margin-top: 8px; transition: opacity 0.15s;
+    }
+    .save-btn:active { opacity: 0.8; }
+    .saved-btn {
+      width: 100%; padding: 14px; border-radius: 12px;
+      background: var(--green-bg); border: 1px solid var(--green); color: var(--green-text);
+      font-size: 15px; font-weight: 600; font-family: 'DM Sans', sans-serif; margin-top: 8px;
+    }
+    .readonly-banner {
+      background: var(--bg3); border: 0.5px solid var(--border2);
+      border-radius: 10px; padding: 10px 14px; margin-bottom: 16px;
+      font-size: 12px; color: var(--text3); text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════
+     SCREEN 1: DASHBOARD
+═══════════════════════════════════════ -->
+<div class="screen active" id="screen-dash">
+  <div class="hdr">
+    <div class="hdr-row">
+      <div class="hdr-title">Dashboard</div>
+    </div>
+  </div>
+  <div class="dash-body" id="dash-body"></div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     SCREEN 2: PAIR SELECTOR
+═══════════════════════════════════════ -->
+<div class="screen" id="screen-pairs">
+  <div class="hdr">
+    <div class="hdr-row">
+      <div class="hdr-title">Trading pairs</div>
+    </div>
+    <div class="hdr-sub">Select a pair to start an analysis</div>
+  </div>
+  <div class="search-wrap">
+    <input class="search-input" type="text" placeholder="Search pairs, e.g. EUR, Gold, BTC..." oninput="filterPairs(this.value)" id="pair-search" />
+  </div>
+  <div class="pair-scroll" id="pair-scroll"></div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     SCREEN 3: PAIR HOME
+═══════════════════════════════════════ -->
+<div class="screen" id="screen-home">
+  <div class="hdr">
+    <div class="hdr-row">
+      <div class="hdr-back" onclick="goBack()">←</div>
+      <div style="flex:1">
+        <div class="hdr-title" id="home-pair-title"></div>
+        <div class="hdr-sub" id="home-pair-sub"></div>
+      </div>
+    </div>
+  </div>
+  <div class="pair-home-body" id="pair-home-body"></div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     SCREEN 4: ANALYSIS
+═══════════════════════════════════════ -->
+<div class="screen" id="screen-analysis">
+  <div class="hdr">
+    <div class="hdr-row">
+      <div class="hdr-back" onclick="goTo('home')">←</div>
+      <div style="flex:1">
+        <div class="hdr-title" id="analysis-title"></div>
+        <div class="hdr-sub" id="analysis-date-label"></div>
+      </div>
+      <div class="progress-label" id="progress-label">0 / 8</div>
+    </div>
+    <div class="progress-row">
+      <div class="progress-track">
+        <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+      </div>
+    </div>
+  </div>
+  <div class="analysis-body" id="analysis-body"></div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     BOTTOM NAV
+═══════════════════════════════════════ -->
+<nav class="bottom-nav">
+  <div class="nav-item active" id="nav-dash" onclick="switchTab('dash')">
+    <div class="nav-icon">⊞</div>
+    <div class="nav-label">Dashboard</div>
+  </div>
+  <div class="nav-item" id="nav-pairs" onclick="switchTab('pairs')">
+    <div class="nav-icon">◎</div>
+    <div class="nav-label">Pairs</div>
+  </div>
+</nav>
+
+<script>
+// ── STATIC DATA ──────────────────────────────────────────────────────
+const PAIRS = {
+  'Forex — Majors': [
+    { id: 'EURUSD', desc: 'Euro / US Dollar' },
+    { id: 'GBPUSD', desc: 'British Pound / US Dollar' },
+    { id: 'USDJPY', desc: 'US Dollar / Japanese Yen' },
+    { id: 'USDCHF', desc: 'US Dollar / Swiss Franc' },
+    { id: 'AUDUSD', desc: 'Australian Dollar / US Dollar' },
+    { id: 'USDCAD', desc: 'US Dollar / Canadian Dollar' },
+    { id: 'NZDUSD', desc: 'New Zealand Dollar / US Dollar' },
+  ],
+  'Forex — Minors': [
+    { id: 'EURGBP', desc: 'Euro / British Pound' },
+    { id: 'EURJPY', desc: 'Euro / Japanese Yen' },
+    { id: 'GBPJPY', desc: 'British Pound / Japanese Yen' },
+    { id: 'EURCHF', desc: 'Euro / Swiss Franc' },
+    { id: 'GBPCHF', desc: 'British Pound / Swiss Franc' },
+    { id: 'AUDJPY', desc: 'Australian Dollar / Japanese Yen' },
+    { id: 'CADJPY', desc: 'Canadian Dollar / Japanese Yen' },
+    { id: 'EURAUD', desc: 'Euro / Australian Dollar' },
+    { id: 'GBPAUD', desc: 'British Pound / Australian Dollar' },
+    { id: 'EURCAD', desc: 'Euro / Canadian Dollar' },
+  ],
+  'Forex — Exotics': [
+    { id: 'USDZAR', desc: 'US Dollar / South African Rand' },
+    { id: 'USDMXN', desc: 'US Dollar / Mexican Peso' },
+    { id: 'USDSEK', desc: 'US Dollar / Swedish Krona' },
+    { id: 'USDNOK', desc: 'US Dollar / Norwegian Krone' },
+    { id: 'USDSGD', desc: 'US Dollar / Singapore Dollar' },
+    { id: 'USDHKD', desc: 'US Dollar / Hong Kong Dollar' },
+    { id: 'USDTRY', desc: 'US Dollar / Turkish Lira' },
+  ],
+  'Commodities': [
+    { id: 'XAUUSD', desc: 'Gold / US Dollar' },
+    { id: 'XAGUSD', desc: 'Silver / US Dollar' },
+    { id: 'XPTUSD', desc: 'Platinum / US Dollar' },
+    { id: 'USOIL',  desc: 'Crude Oil (WTI)' },
+    { id: 'UKOIL',  desc: 'Crude Oil (Brent)' },
+    { id: 'NATGAS', desc: 'Natural Gas' },
+    { id: 'COPPER', desc: 'Copper' },
+  ],
+  'Crypto': [
+    { id: 'BTCUSD', desc: 'Bitcoin / US Dollar' },
+    { id: 'ETHUSD', desc: 'Ethereum / US Dollar' },
+    { id: 'SOLUSD', desc: 'Solana / US Dollar' },
+    { id: 'XRPUSD', desc: 'XRP / US Dollar' },
+    { id: 'BNBUSD', desc: 'BNB / US Dollar' },
+    { id: 'ADAUSD', desc: 'Cardano / US Dollar' },
+    { id: 'DOTUSD', desc: 'Polkadot / US Dollar' },
+  ],
+  'Indices': [
+    { id: 'US500',  desc: 'S&P 500' },
+    { id: 'US30',   desc: 'Dow Jones Industrial' },
+    { id: 'USTECH', desc: 'Nasdaq 100' },
+    { id: 'GER40',  desc: 'DAX 40' },
+    { id: 'UK100',  desc: 'FTSE 100' },
+    { id: 'JPN225', desc: 'Nikkei 225' },
+    { id: 'AUS200', desc: 'ASX 200' },
+  ],
+  'Stocks': [
+    { id: 'AAPL',  desc: 'Apple Inc.' },
+    { id: 'MSFT',  desc: 'Microsoft Corp.' },
+    { id: 'GOOGL', desc: 'Alphabet Inc.' },
+    { id: 'AMZN',  desc: 'Amazon.com Inc.' },
+    { id: 'NVDA',  desc: 'NVIDIA Corp.' },
+    { id: 'META',  desc: 'Meta Platforms' },
+    { id: 'TSLA',  desc: 'Tesla Inc.' },
+    { id: 'BRK',   desc: 'Berkshire Hathaway' },
+    { id: 'JPM',   desc: 'JPMorgan Chase' },
+    { id: 'V',     desc: 'Visa Inc.' },
+  ],
+};
+
+const PAIR_LOOKUP = {};
+Object.values(PAIRS).flat().forEach(p => { PAIR_LOOKUP[p.id] = p; });
+
+const TIMEFRAMES = [
+  { id: 'w',   label: 'Weekly' },
+  { id: 'd',   label: 'Daily' },
+  { id: '4h',  label: '4 hour' },
+  { id: '1h',  label: '1 hour' },
+  { id: '30m', label: '30 min' },
+];
+
+const PATTERNS = [
+  { id: 'hs',   label: 'Head & shoulders' },
+  { id: 'ihs',  label: 'Inv. H&S' },
+  { id: 'dt',   label: 'Double top' },
+  { id: 'db',   label: 'Double bottom' },
+  { id: 'bwf',  label: 'Bear wedge / flag' },
+  { id: 'bulf', label: 'Bull wedge / flag' },
+];
+
+const CONFIRM_ITEMS = [
+  ['e1', 'Candle confirmation (engulfing, pin bar, doji rejection)'],
+  ['e2', 'Candle closed — not just a wick'],
+  ['e3', 'No high-impact news within next 4 hours <span class="news-tag">check calendar</span>'],
+  ['e4', 'Active session — London or New York open'],
+];
+
+const RISK_ITEMS = [
+  ['r1', 'SL placed above / below pattern structure'],
+  ['r2', 'R:R is at least 1:2'],
+  ['r3', 'Lot size calculated — max 1–2% account risk'],
+  ['r4', 'Margin required ≤ 30% of account balance'],
+];
+
+const CHECKABLES = ['e1','e2','e3','e4','r1','r2','r3','r4'];
+const TOTAL = CHECKABLES.length;
+
+// ── APP STATE ────────────────────────────────────────────────────────
+let currentPair = null;
+let currentAnalysisId = null;
+let isReadOnly = false;
+let prevScreen = 'dash';
+let liveState = { biases: {}, patterns: {}, checks: new Set() };
+
+// ── DB ───────────────────────────────────────────────────────────────
+function loadDB() { try { return JSON.parse(localStorage.getItem('tradedb') || '{}'); } catch { return {}; } }
+function saveDB(db) { localStorage.setItem('tradedb', JSON.stringify(db)); }
+function getAnalyses(pairId) { const db = loadDB(); return (db[pairId] || []).sort((a,b) => b.date - a.date); }
+function saveAnalysis(pairId, a) {
+  const db = loadDB();
+  if (!db[pairId]) db[pairId] = [];
+  const i = db[pairId].findIndex(x => x.id === a.id);
+  if (i >= 0) db[pairId][i] = a; else db[pairId].push(a);
+  saveDB(db);
+}
+
+function pairStats(pairId) {
+  const analyses = getAnalyses(pairId);
+  const total = analyses.length;
+  const traded = analyses.filter(a => a.outcome);
+  const wins = traded.filter(a => a.outcome === 'win').length;
+  const losses = traded.filter(a => a.outcome === 'loss').length;
+  const winPct = traded.length ? Math.round((wins / traded.length) * 100) : null;
+  return { total, wins, losses, winPct, traded: traded.length };
+}
+
+// ── NAVIGATION ───────────────────────────────────────────────────────
+function goTo(screen) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + screen).classList.add('active');
+  window.scrollTo(0, 0);
+}
+
+function goBack() {
+  goTo(prevScreen === 'pairs' ? 'pairs' : 'dash');
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('nav-' + tab).classList.add('active');
+  if (tab === 'dash') renderDashboard();
+  if (tab === 'pairs') renderPairs();
+  goTo(tab);
+}
+
+// ── SCREEN 1: DASHBOARD ──────────────────────────────────────────────
+function renderDashboard() {
+  const db = loadDB();
+  const allPairIds = Object.keys(db).filter(id => db[id] && db[id].length > 0);
+
+  // global stats
+  let totalAnalyses = 0, totalWins = 0, totalLosses = 0;
+  allPairIds.forEach(id => {
+    const s = pairStats(id);
+    totalAnalyses += s.total;
+    totalWins += s.wins;
+    totalLosses += s.losses;
+  });
+  const totalTraded = totalWins + totalLosses;
+  const globalWinPct = totalTraded > 0 ? Math.round((totalWins / totalTraded) * 100) : null;
+  const winColor = globalWinPct === null ? 'neutral' : globalWinPct >= 50 ? 'green' : 'red';
+  const winPctDisplay = globalWinPct !== null ? globalWinPct + '%' : '—';
+  const winBarW = globalWinPct !== null ? globalWinPct : 0;
+
+  const body = document.getElementById('dash-body');
+
+  if (allPairIds.length === 0) {
+    body.innerHTML = `
+      <div class="metrics-grid">
+        <div class="metric-card full">
+          <div class="metric-num neutral">—</div>
+          <div class="metric-lbl">Overall win rate</div>
+          <div class="winbar-wrap"><div class="winbar-fill" style="width:0%"></div></div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-num neutral">0</div>
+          <div class="metric-lbl">Total analyses</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-num neutral">0</div>
+          <div class="metric-lbl">Trades marked</div>
+        </div>
+      </div>
+      <div class="empty-dash">
+        No analyses yet.<br>Head to <strong>Pairs</strong> to start your first one.
+        <div class="empty-dash-hint">Your traded pairs will show up here.</div>
+      </div>`;
+    return;
+  }
+
+  // sort pairs by most recent analysis date
+  const sortedPairs = allPairIds.sort((a, b) => {
+    const aDate = Math.max(...(db[a] || []).map(x => x.date));
+    const bDate = Math.max(...(db[b] || []).map(x => x.date));
+    return bDate - aDate;
+  });
+
+  let html = `
+    <div class="metrics-grid">
+      <div class="metric-card full">
+        <div class="metric-num ${winColor}">${winPctDisplay}</div>
+        <div class="metric-lbl">Overall win rate</div>
+        <div class="winbar-wrap"><div class="winbar-fill" style="width:${winBarW}%"></div></div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-num green">${totalWins}</div>
+        <div class="metric-lbl">Total wins</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-num red">${totalLosses}</div>
+        <div class="metric-lbl">Total losses</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-num neutral">${totalAnalyses}</div>
+        <div class="metric-lbl">Analyses</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-num neutral">${allPairIds.length}</div>
+        <div class="metric-lbl">Pairs tracked</div>
+      </div>
+    </div>
+    <div class="section-hdr">
+      <div class="section-hdr-label">Recently traded</div>
+    </div>`;
+
+  sortedPairs.forEach(id => {
+    const info = PAIR_LOOKUP[id] || { id, desc: '' };
+    const s = pairStats(id);
+    const wr = s.winPct;
+    const wrColor = wr === null ? 'neutral' : wr >= 50 ? 'green' : 'red';
+    const wrDisplay = wr !== null ? wr + '%' : '—';
+    const cardClass = s.wins > s.losses ? 'won' : s.losses > s.wins ? 'lost' : '';
+    html += `
+      <div class="recent-pair-card ${cardClass}" onclick="openPairFromDash('${id}')">
+        <div class="rpc-left">
+          <div class="rpc-name">${id}</div>
+          <div class="rpc-desc">${info.desc}</div>
+        </div>
+        <div class="rpc-right">
+          <div class="rpc-winrate ${wrColor}">${wrDisplay}</div>
+          <div class="rpc-trades">${s.total} analys${s.total === 1 ? 'is' : 'es'}</div>
+        </div>
+      </div>`;
+  });
+
+  body.innerHTML = html;
+}
+
+function openPairFromDash(id) {
+  prevScreen = 'dash';
+  const info = PAIR_LOOKUP[id] || { id, desc: '' };
+  selectPair(id, info.desc);
+}
+
+// ── SCREEN 2: PAIR SELECTOR ──────────────────────────────────────────
+function renderPairs(filter) {
+  const db = loadDB();
+  const q = (filter || '').toLowerCase();
+  let html = '';
+  Object.entries(PAIRS).forEach(([cat, pairs]) => {
+    const filtered = pairs.filter(p => p.id.toLowerCase().includes(q) || p.desc.toLowerCase().includes(q));
+    if (!filtered.length) return;
+    html += `<div class="cat-label">${cat}</div><div class="pair-list">`;
+    filtered.forEach(p => {
+      const s = pairStats(p.id);
+      let badge = 'No data', badgeClass = '';
+      if (s.traded > 0) {
+        badge = s.winPct + '%';
+        badgeClass = s.winPct >= 50 ? 'green' : 'red';
+      } else if (s.total > 0) {
+        badge = s.total + ' saved';
+        badgeClass = '';
+      }
+      html += `<div class="pair-row" onclick="selectPair('${p.id}','${p.desc.replace(/'/g,"\\'")}')">
+        <div>
+          <div class="pair-name">${p.id}</div>
+          <div class="pair-desc">${p.desc}</div>
+        </div>
+        <div class="pair-badge ${badgeClass}">${badge}</div>
+      </div>`;
+    });
+    html += '</div>';
+  });
+  if (!html) html = '<div class="empty-state">No pairs found.</div>';
+  document.getElementById('pair-scroll').innerHTML = html;
+}
+
+function filterPairs(val) { renderPairs(val); }
+
+function selectPair(id, desc) {
+  prevScreen = document.querySelector('.screen.active').id.replace('screen-', '');
+  currentPair = { id, desc };
+  document.getElementById('home-pair-title').textContent = id;
+  document.getElementById('home-pair-sub').textContent = desc;
+  renderPairHome();
+  goTo('home');
+}
+
+// ── SCREEN 3: PAIR HOME ───────────────────────────────────────────────
+function renderPairHome() {
+  const s = pairStats(currentPair.id);
+  const winColor = s.winPct === null ? 'neutral' : s.winPct >= 50 ? 'green' : 'red';
+  const wrDisplay = s.winPct !== null ? s.winPct + '%' : '—';
+
+  let html = `
+    <button class="new-analysis-btn" onclick="startNewAnalysis()">
+      <span style="font-size:20px;line-height:1">+</span> New analysis
+    </button>
+    <div class="pair-stats-row">
+      <div class="pair-stat">
+        <div class="pair-stat-num ${winColor}">${wrDisplay}</div>
+        <div class="pair-stat-lbl">Win rate</div>
+      </div>
+      <div class="pair-stat">
+        <div class="pair-stat-num green">${s.wins}</div>
+        <div class="pair-stat-lbl">Wins</div>
+      </div>
+      <div class="pair-stat">
+        <div class="pair-stat-num red">${s.losses}</div>
+        <div class="pair-stat-lbl">Losses</div>
+      </div>
+      <div class="pair-stat">
+        <div class="pair-stat-num neutral">${s.total}</div>
+        <div class="pair-stat-lbl">Total</div>
+      </div>
+    </div>
+    <div class="history-sec-label">Previous analyses</div>`;
+
+  const analyses = getAnalyses(currentPair.id);
+  if (!analyses.length) {
+    html += '<div class="empty-state">No analyses yet.</div>';
+  } else {
+    html += analyses.map(a => {
+      const d = new Date(a.date);
+      const dateStr = d.toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' });
+      const timeStr = d.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+      const checkCount = (a.checks || []).length;
+      const pct = Math.round((checkCount / TOTAL) * 100);
+      let chips = '';
+      TIMEFRAMES.forEach(tf => {
+        if (a.biases && a.biases[tf.id]) chips += `<span class="chip ${a.biases[tf.id]}">${tf.label}: ${a.biases[tf.id]}</span>`;
+      });
+      if (checkCount === TOTAL) chips += `<span class="chip done">Complete</span>`;
+      if (!chips) chips = '<span class="chip">No bias set</span>';
+      const cardClass = a.outcome === 'win' ? 'won' : a.outcome === 'loss' ? 'lost' : '';
+      const winActive = a.outcome === 'win' ? 'active' : '';
+      const lossActive = a.outcome === 'loss' ? 'active' : '';
+      const nameHtml = a.name ? `<div class="history-name">${a.name}</div>` : '';
+      return `<div class="history-card ${cardClass}" id="card-${a.id}">
+        <div class="history-card-top" onclick="openAnalysis('${a.id}')">
+          ${nameHtml || '<div></div>'}
+          <div class="history-time">${dateStr} · ${timeStr}</div>
+        </div>
+        <div class="history-chips" onclick="openAnalysis('${a.id}')">${chips}</div>
+        <div class="history-progress" onclick="openAnalysis('${a.id}')">
+          <div class="history-progress-fill" style="width:${pct}%"></div>
+        </div>
+        <div class="outcome-row">
+          <div class="outcome-btn win-btn ${winActive}" onclick="setOutcome('${a.id}','win')">Win</div>
+          <div class="outcome-btn loss-btn ${lossActive}" onclick="setOutcome('${a.id}','loss')">Loss</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  document.getElementById('pair-home-body').innerHTML = html;
+}
+
+function setOutcome(analysisId, outcome) {
+  const db = loadDB();
+  const analyses = db[currentPair.id] || [];
+  const a = analyses.find(x => x.id === analysisId);
+  if (!a) return;
+  a.outcome = a.outcome === outcome ? null : outcome;
+  saveDB(db);
+  renderPairHome();
+}
+
+// ── SCREEN 4: ANALYSIS ────────────────────────────────────────────────
+function startNewAnalysis() {
+  currentAnalysisId = Date.now().toString();
+  isReadOnly = false;
+  liveState = { biases: {}, patterns: {}, checks: new Set(), name: '' };
+  renderAnalysisScreen();
+  goTo('analysis');
+}
+
+function openAnalysis(id) {
+  const db = loadDB();
+  const a = (db[currentPair.id] || []).find(x => x.id === id);
+  if (!a) return;
+  currentAnalysisId = id;
+  isReadOnly = false;
+  liveState = {
+    biases: { ...(a.biases || {}) },
+    patterns: { ...(a.patterns || {}) },
+    checks: new Set(a.checks || []),
+    name: a.name || '',
+  };
+  renderAnalysisScreen(a.date);
+  goTo('analysis');
+}
+
+function renderAnalysisScreen(savedDate) {
+  const d = savedDate ? new Date(savedDate) : new Date();
+  const dateStr = d.toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' });
+  const timeStr = d.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+  document.getElementById('analysis-title').textContent = currentPair.id;
+  document.getElementById('analysis-date-label').textContent = dateStr + ' · ' + timeStr;
+
+  const ro = false;
+  let html = '';
+  html += `<input class="analysis-name-input" id="analysis-name" type="text" placeholder="Name this setup… e.g. Silver H&S Sell 1:3" value="${liveState.name}" oninput="liveState.name=this.value" maxlength="80" />`;
+
+  html += '<div class="sec-label">Top-down bias & patterns</div><div class="tf-card">';
+  TIMEFRAMES.forEach(tf => {
+    const bias = liveState.biases[tf.id] || '';
+    html += `<div class="tf-block">
+      <div class="tf-top">
+        <div class="tf-left">
+          <div class="dot ${bias}" id="dot-${tf.id}"></div>
+          <span class="tf-name">${tf.label}</span>
+        </div>
+        <div class="bias-pills">
+          <div class="bias-pill ${bias==='bull'?'bull':''}" id="bull-${tf.id}" onclick="setBias('${tf.id}','bull')">Bullish</div>
+          <div class="bias-pill ${bias==='bear'?'bear':''}" id="bear-${tf.id}" onclick="setBias('${tf.id}','bear')">Bearish</div>
+        </div>
+      </div>
+      <div class="patterns-grid">`;
+    PATTERNS.forEach(p => {
+      const key = `${tf.id}-${p.id}`;
+      const spotted = liveState.patterns[key] === 'spotted';
+      html += `<div class="pat-btn ${spotted?'spotted':''}" id="pat-${key}" onclick="cyclePat('${tf.id}','${p.id}')">${p.label}</div>`;
+    });
+    html += '</div></div>';
+  });
+  html += '</div>';
+
+  html += '<div class="sec-label">Entry confirmation</div><div class="check-card">';
+  CONFIRM_ITEMS.forEach(([id, label]) => {
+    const checked = liveState.checks.has(id);
+    html += `<div class="check-row" onclick="toggleCheck('${id}')">
+      <div class="checkbox ${checked?'checked':''}" id="cb-${id}"></div>
+      <div class="check-label ${checked?'checked':''}" id="lb-${id}">${label}</div>
+    </div>`;
+  });
+  html += '</div>';
+
+  html += '<div class="sec-label">Risk & order</div><div class="check-card">';
+  RISK_ITEMS.forEach(([id, label]) => {
+    const checked = liveState.checks.has(id);
+    html += `<div class="check-row" onclick="toggleCheck('${id}')">
+      <div class="checkbox ${checked?'checked':''}" id="cb-${id}"></div>
+      <div class="check-label ${checked?'checked':''}" id="lb-${id}">${label}</div>
+    </div>`;
+  });
+  html += '</div>';
+
+  html += `<div class="all-done ${liveState.checks.size===TOTAL?'visible':''}" id="all-done">
+    <div class="done-icon">✅</div>
+    <div class="done-title">Checklist complete</div>
+    <div class="done-sub">All clear — you're ready to place the trade.</div>
+  </div>`;
+
+  html += `<button class="save-btn" id="save-btn" onclick="saveCurrentAnalysis()">Save analysis</button>`;
+
+  document.getElementById('analysis-body').innerHTML = html;
+  updateProgress();
+}
+
+function setBias(tf, dir) {
+  liveState.biases[tf] = liveState.biases[tf] === dir ? null : dir;
+  const b = liveState.biases[tf] || '';
+  document.getElementById('dot-'+tf).className = 'dot' + (b ? ' '+b : '');
+  document.getElementById('bull-'+tf).className = 'bias-pill' + (b==='bull' ? ' bull' : '');
+  document.getElementById('bear-'+tf).className = 'bias-pill' + (b==='bear' ? ' bear' : '');
+}
+
+function cyclePat(tf, pat) {
+  const key = `${tf}-${pat}`;
+  liveState.patterns[key] = liveState.patterns[key] === 'spotted' ? null : 'spotted';
+  document.getElementById('pat-'+key).className = 'pat-btn' + (liveState.patterns[key] ? ' spotted' : '');
+}
+
+function toggleCheck(id) {
+  liveState.checks.has(id) ? liveState.checks.delete(id) : liveState.checks.add(id);
+  document.getElementById('cb-'+id).className = 'checkbox' + (liveState.checks.has(id) ? ' checked' : '');
+  document.getElementById('lb-'+id).className = 'check-label' + (liveState.checks.has(id) ? ' checked' : '');
+  updateProgress();
+}
+
+function updateProgress() {
+  const done = liveState.checks.size;
+  const pct = Math.round((done / TOTAL) * 100);
+  const fill = document.getElementById('progress-fill');
+  const lbl = document.getElementById('progress-label');
+  const ad = document.getElementById('all-done');
+  if (fill) fill.style.width = pct + '%';
+  if (lbl) lbl.textContent = done + ' / ' + TOTAL;
+  if (ad) ad.className = 'all-done' + (done === TOTAL ? ' visible' : '');
+}
+
+function saveCurrentAnalysis() {
+  const nameEl = document.getElementById('analysis-name');
+  if (nameEl) liveState.name = nameEl.value;
+  saveAnalysis(currentPair.id, {
+    id: currentAnalysisId,
+    date: parseInt(currentAnalysisId),
+    name: liveState.name || '',
+    biases: { ...liveState.biases },
+    patterns: { ...liveState.patterns },
+    checks: [...liveState.checks],
+  });
+  renderPairHome();
+  setTimeout(() => goTo('home'), 300);
+}
+
+// ── INIT ─────────────────────────────────────────────────────────────
+renderDashboard();
+renderPairs();
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
+}
+</script>
+</body>
+</html>
