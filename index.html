@@ -234,6 +234,19 @@
     }
     .pat-btn:active { opacity: 0.8; transform: scale(0.97); }
     .pat-btn.spotted { background: var(--green-bg); color: var(--green-text); border-color: var(--green); }
+    .analysis-name-input {
+      width: 100%; background: var(--bg2); border: 0.5px solid var(--border2);
+      border-radius: 10px; padding: 11px 14px; font-size: 14px; font-weight: 500;
+      color: var(--text); font-family: 'DM Sans', sans-serif; outline: none;
+      margin-bottom: 16px;
+    }
+    .analysis-name-input::placeholder { color: var(--text3); font-weight: 400; }
+    .analysis-name-input:focus { border-color: var(--green); }
+    .analysis-name-readonly {
+      font-size: 14px; font-weight: 500; color: var(--text2);
+      padding: 4px 0; margin-bottom: 12px;
+    }
+    .history-name { font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 4px; }
     .check-card { background: var(--bg2); border: 0.5px solid var(--border); border-radius: 14px; overflow: hidden; margin-bottom: 16px; }
     .check-row {
       display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px;
@@ -725,11 +738,13 @@ function renderPairHome() {
       const cardClass = a.outcome === 'win' ? 'won' : a.outcome === 'loss' ? 'lost' : '';
       const winActive = a.outcome === 'win' ? 'active' : '';
       const lossActive = a.outcome === 'loss' ? 'active' : '';
+      const nameHtml = a.name ? `<div class="history-name">${a.name}</div>` : '';
       return `<div class="history-card ${cardClass}" id="card-${a.id}">
         <div class="history-card-top" onclick="openAnalysis('${a.id}')">
           <div class="history-date">${dateStr}</div>
           <div class="history-time">${timeStr}</div>
         </div>
+        ${nameHtml}
         <div class="history-chips" onclick="openAnalysis('${a.id}')">${chips}</div>
         <div class="history-progress" onclick="openAnalysis('${a.id}')">
           <div class="history-progress-fill" style="width:${pct}%"></div>
@@ -759,7 +774,7 @@ function setOutcome(analysisId, outcome) {
 function startNewAnalysis() {
   currentAnalysisId = Date.now().toString();
   isReadOnly = false;
-  liveState = { biases: {}, patterns: {}, checks: new Set() };
+  liveState = { biases: {}, patterns: {}, checks: new Set(), name: '' };
   renderAnalysisScreen();
   goTo('analysis');
 }
@@ -774,6 +789,7 @@ function openAnalysis(id) {
     biases: { ...(a.biases || {}) },
     patterns: { ...(a.patterns || {}) },
     checks: new Set(a.checks || []),
+    name: a.name || '',
   };
   renderAnalysisScreen(a.date);
   goTo('analysis');
@@ -788,7 +804,12 @@ function renderAnalysisScreen(savedDate) {
 
   const ro = isReadOnly;
   let html = '';
-  if (ro) html += '<div class="readonly-banner">Viewing saved analysis — read only</div>';
+  if (ro) {
+    html += '<div class="readonly-banner">Viewing saved analysis — read only</div>';
+    if (liveState.name) html += `<div class="analysis-name-readonly">“${liveState.name}”</div>`;
+  } else {
+    html += `<input class="analysis-name-input" id="analysis-name" type="text" placeholder="Name this setup… e.g. Silver H&S Sell 1:3" value="${liveState.name}" oninput="liveState.name=this.value" maxlength="80" />`;
+  }
 
   html += '<div class="sec-label">Top-down bias & patterns</div><div class="tf-card">';
   TIMEFRAMES.forEach(tf => {
@@ -884,9 +905,12 @@ function updateProgress() {
 }
 
 function saveCurrentAnalysis() {
+  const nameEl = document.getElementById('analysis-name');
+  if (nameEl) liveState.name = nameEl.value;
   saveAnalysis(currentPair.id, {
     id: currentAnalysisId,
     date: parseInt(currentAnalysisId),
+    name: liveState.name || '',
     biases: { ...liveState.biases },
     patterns: { ...liveState.patterns },
     checks: [...liveState.checks],
